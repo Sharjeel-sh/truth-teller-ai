@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabaseClient";
 
 const plans = [
   {
@@ -48,7 +50,10 @@ const plans = [
   },
 ];
 
-const PricingSection = () => (
+const PricingSection = () => {
+  const navigate = useNavigate();
+
+  return (
   <section id="pricing" className="py-24">
     <div className="container mx-auto px-4">
       <motion.div
@@ -98,19 +103,69 @@ const PricingSection = () => (
                 </li>
               ))}
             </ul>
-            <Link to="/signup">
+            {/* CTA: if Pro plan, check auth and start checkout; otherwise default to signup/contact */}
+            <div>
               <Button
+                onClick={async () => {
+                  if (plan.name === "Pro") {
+                    try {
+                      const {
+                        data: { user },
+                      } = await supabase.auth.getUser();
+                      if (!user) {
+                        navigate('/signup');
+                        return;
+                      }
+                      // Start checkout on backend (endpoint must be implemented)
+                      const res = await fetch('/api/create-checkout-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        // Send a friendly alias that the backend maps to the real price id.
+                        body: JSON.stringify({ priceId: 'pro_monthly' }),
+                      });
+                      const json = await res.json();
+                      if (res.ok && json.url) {
+                        window.location.href = json.url;
+                      } else {
+                        // Show backend message if available for easier debugging
+                        const msg = json?.error || json?.message || 'Unable to start checkout.';
+                        toast.error(`Checkout error: ${msg}`);
+                      }
+                    } catch (err) {
+                      toast.error('Checkout error.');
+                    }
+                  } else if (plan.name === 'Enterprise') {
+                    // Contact sales placeholder
+                    window.location.href = 'mailto:sales@example.com';
+                  } else {
+                    // Free plan: if user is already logged in, send them to dashboard;
+                    // otherwise prompt signup.
+                    try {
+                      const {
+                        data: { user },
+                      } = await supabase.auth.getUser();
+                      if (!user) {
+                        navigate('/signup');
+                        return;
+                      }
+                      navigate('/dashboard');
+                    } catch (err) {
+                      navigate('/signup');
+                    }
+                  }
+                }}
                 className={`w-full ${plan.highlight ? "glow-sm" : ""}`}
                 variant={plan.highlight ? "default" : "outline"}
               >
                 {plan.cta}
               </Button>
-            </Link>
+            </div>
           </motion.div>
         ))}
       </div>
     </div>
   </section>
-);
+  );
+};
 
 export default PricingSection;

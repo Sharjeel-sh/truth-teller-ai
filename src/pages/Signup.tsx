@@ -5,6 +5,8 @@ import { Mail, Lock, User, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabaseClient";
+import { useNavigate } from "react-router-dom";
 
 const Signup = () => {
   const [name, setName] = useState("");
@@ -12,7 +14,9 @@ const Signup = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSignup = (e: React.FormEvent) => {
+  const navigate = useNavigate();
+
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password) {
       toast.error("Please fill in all fields.");
@@ -22,11 +26,24 @@ const Signup = () => {
       toast.error("Password must be at least 6 characters.");
       return;
     }
-    setLoading(true);
-    setTimeout(() => {
-      toast.success("Account created! Check your email to verify.");
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: name } },
+      });
+      if (error) {
+        toast.error(error.message || 'Signup failed');
+      } else {
+        toast.success('Account created! Check your email to verify.');
+        navigate('/login');
+      }
+    } catch (err) {
+      toast.error('An unexpected error occurred.');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
